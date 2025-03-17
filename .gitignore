@@ -1,1 +1,23 @@
-lead-gen-ai/venv/
+# Ignore Python virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore .env files (environment variables)
+.env
+
+# Ignore Google credentials file
+google_sheets_credentials.json
+
+# Ignore Node.js dependencies (for the frontend)
+lead-gen-ui/.next/
+lead-gen-ui/node_modules/
+
+# Ignore editor-specific files
+.vscode/
+.idea/
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
