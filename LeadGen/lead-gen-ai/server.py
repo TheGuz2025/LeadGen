@@ -30,7 +30,7 @@ app = FastAPI()
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict in production!
+    allow_origins=["https://www.theguzblueprint.com", "http://www.theguzblueprint.com"],  #  Restrict to your domain!
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,7 +39,7 @@ app.add_middleware(
 # Google Sheets Setup
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SERVICE_ACCOUNT_FILE = "google_sheets_credentials.json"
-SHEET_ID = "1JQ13k3KJ1baInqtavH58bLwUAMcR2B0e2FrFVrD-7Fo"
+SHEET_ID = "1JQ13k3KJ1baInqtavH58bLwUAMcR2B0e2FrFVrD-7Fo"  # Replace with your Sheet ID
 
 creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 client = gspread.authorize(creds)
@@ -53,7 +53,7 @@ class Lead(BaseModel):
     name: str
     income: str
     savings: str
-    credit_score: Optional[str] = None
+    credit_score: Optional[str] = None  # Optional field
     dob: Optional[str] = None
     lump_sum: Optional[str] = None
     monthly_contribution: Optional[str] = None
@@ -83,7 +83,7 @@ def get_llm_config(config_list):
     return {
         "config_list": config_list,
         "temperature": 0.7,
-        # "use_cache": False  # Disable caching during development -- REMOVE THIS LINE
+        # "use_cache": False  #  <-- Remove this - not a valid parameter
     }
 # --- Agent Definitions (Simplified Prompts, No Markdown) ---
 
@@ -150,12 +150,11 @@ async def process_lead_pipeline(lead: Lead):
         groupchat = autogen.GroupChat(
             agents=[lead_qualification_agent, financial_strategy_agent, risk_assessment_agent, policy_advisor_agent, anti_iul_agent, followup_agent],
             messages=[],
-            max_round=7,  # Max rounds *per speaker*
+            max_round=12,  # Allow for sufficient rounds
             speaker_selection_method="round_robin"
         )
         manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=get_llm_config(config_list))
-        #Important:
-        manager.max_round = 1 # Only one round of conversation
+        manager.max_round = 1 # Set max_round for the *manager*
 
         # Construct the initial message
         initial_message = (
@@ -180,29 +179,29 @@ async def process_lead_pipeline(lead: Lead):
 
         # Start the chat
         await user_proxy.a_initiate_chat(manager, message=initial_message)
+
         # --- 3. Extract and Process Responses ---
         results: Dict[str, Any] = {}  # Use a dictionary to store results
 
         logger.debug("groupchat.messages: %s", groupchat.messages)
 
         for message in groupchat.messages:
-            # Use message['name'] to identify the agent, NOT message['role']
-            if message['role'] == 'user' and message['name'] != 'User':  # Corrected extraction logic
+            if message['role'] == 'assistant':  # Correctly check for 'assistant' role
                 agent_name = message['name']
                 content = message.get('content', '')
                 logger.debug(f"Processing message from {agent_name}: {content}")
 
                 try:
-                    # More Robust JSON Parsing: Check if content looks like JSON
+                    # JSON Parsing: Check if content looks like JSON and then parse
                     parsed_content = json.loads(content) if content.strip().startswith("{") and content.strip().endswith("}") else {}
                     if parsed_content:
-                        results[agent_name] = parsed_content
+                         results[agent_name] = parsed_content
                     else:
                         logger.warning(f"Agent {agent_name} returned malformed JSON.")
-                        results[agent_name] = {"error": "Malformed JSON from AI"}
+                        results[agent_name] = {"error": "Malformed JSON from AI"}  # Store an error indicator
                 except json.JSONDecodeError:
                     logger.error(f"JSONDecodeError for {agent_name}. Content: {content}")
-                    results[agent_name] = {"error": "Invalid JSON from AI"}  # More informative error
+                    results[agent_name] = {"error": "Invalid JSON from AI"}
 
         # --- 4. Combine Results (with Fallbacks) ---
         ai_analysis = {
